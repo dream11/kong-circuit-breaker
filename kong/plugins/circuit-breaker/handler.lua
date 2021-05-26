@@ -2,13 +2,9 @@ local cjson = require "cjson"
 local pl_utils = require "pl.utils"
 
 local kong = kong
-
-local timer_at = ngx.timer.at
+local ngx = ngx
 
 local circuit_breaker_lib = require "circuit-breaker-lib.factory"
-local statsd_logger = require "statsd-lib.statsd_logger"
-local app_config = require "kong.plugins.app-config.config"
-
 
 local CircuitBreakerHandler = {}
 CircuitBreakerHandler.PRIORITY = 930
@@ -19,12 +15,6 @@ local circuit_breakers = circuit_breaker_lib:new({})
 
 local function get_api_identifier()
 	return kong.request.get_method() .. "_" .. kong.request.get_path()
-end
-
-local function cb_counter_logs()
-	kong.log.debug(get_api_identifier() .. " CB State = " .. tostring(kong.ctx.plugin.cb._state))
-	kong.log.debug("Total = " .. tostring(kong.ctx.plugin.cb._counters.requests) .. " Failures = " .. tostring(kong.ctx.plugin.cb._counters.total_failures) .. " Success = " .. tostring(kong.ctx.plugin.cb._counters.total_successes))
-	kong.log.debug("Min calls in window " .. tostring(kong.ctx.plugin.cb._min_calls_in_window))
 end
 
 local function is_successful(upstream_status_code)
@@ -41,35 +31,6 @@ local function get_circuit_breaker(conf, api_identifier)
 	end
 
 	return circuit_breakers:get_circuit_breaker(cb_table_key, api_identifier, conf)
-end
-
-local function getLogger(host, port)
-	local datadog_agent, err =
-		statsd_logger:new(
-		{
-			host = host or "localhost",
-			port = port or 8125,
-			prefix = "kong"
-		}
-	)
-	if err then
-		kong.log.err("Failed to create Dogstatsd logger for circuit-breaker plugin: ", err)
-		return nil, err
-	end
-	kong.log.info("Dogstatsd logger created for circuit-breaker plugin")
-	return datadog_agent, nil
-end
-
-local function send_datadog_event(premature, api_identifier, new_state, upstream_host)
-	if premature then
-		return
-	end
-    local datadog_host, datadog_port = app_config.get_datadog_host_and_port()
-
-	local dogstatsd, _ = getLogger(datadog_host, datadog_port)
-	local tags = {"upstream:" .. upstream_host, "service:d11-kong", "name:kong", "circuit_breaker:" .. api_identifier, "cb_state:" .. new_state}
-	dogstatsd:send_statsd("circuit_breaker.count", 1, "c", 1, tags)
-	dogstatsd:close_socket()
 end
 
 local function get_excluded_apis(conf)
@@ -102,7 +63,6 @@ local function p_access(conf)
 	-- Start before proxy logic over here
 	local cb = get_circuit_breaker(conf, api_identifier)
 
-	-- Todo: Improve error handling
 	local _, err_cb = cb:_before()
 	if err_cb then
 		local headers = {["Content-Type"] = conf.response_header_override or "text/plain"}
@@ -152,11 +112,8 @@ function CircuitBreakerHandler:log(conf)
 	end
 	if cb._last_state_notified == false then
 		cb._last_state_notified = true
-		-- Send latest state change to datadog
-		local ok, err = timer_at(0, send_datadog_event, api_identifier, cb._state, kong.ctx.shared.upstream_host)
-		if not ok then
-			kong.log.err("Failed to create timer to send datadog event: ", err)
-		end
+		-- Send latest state change to your monitoring setup
+		kong.log.notice("Circuit breaker state updated for route " .. api_identifier)
 	end
 end
 
