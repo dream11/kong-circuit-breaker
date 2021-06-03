@@ -1,17 +1,20 @@
 local helpers = require "spec.helpers"
 local fixtures = require "kong.plugins.circuit-breaker.fixtures"
+local inspect = require "inspect"
 
+
+local strategy = "postgres"
 for _, strategy in helpers.each_strategy() do
     describe("circuit breaker plugin [#" .. strategy .. "]", function()
         local mock_host = helpers.mock_upstream_host;
         local mock_port = 10001
         local window_time = 10
-        local wait_duration_in_open_state = 5
-        local half_open_min_calls_in_window = 10
-        local half_open_max_calls_in_window = 12
-        local min_calls_in_window = 10
+        local wait_duration_in_open_state = 3
+        local half_open_min_calls_in_window = 2
+        local half_open_max_calls_in_window = 4
+        local min_calls_in_window = 6
         local failure_percent_threshold = 50
-        local wait_duration_in_half_open_state = 5
+        local wait_duration_in_half_open_state = 15
         local api_call_timeout_ms = 10
         local cb_error_status_code = 599
         local excluded_apis = "{\"GET_/kong-healthcheck\": true}"
@@ -46,7 +49,8 @@ for _, strategy in helpers.each_strategy() do
                 half_open_max_calls_in_window = half_open_max_calls_in_window,
                 half_open_min_calls_in_window = half_open_min_calls_in_window,
                 error_status_code = cb_error_status_code,
-                excluded_apis = excluded_apis
+                excluded_apis = excluded_apis,
+                version = 0,
             }
         }
 
@@ -87,7 +91,7 @@ for _, strategy in helpers.each_strategy() do
         before_each(function ()
             assert(helpers.start_kong({
                 database = strategy,
-                plugins = "bundled, circuit-breaker",
+                plugins = "circuit-breaker",
                 nginx_conf = "spec/fixtures/custom_nginx.template"
             }, nil, nil, fixtures.fixtures))
         end)
@@ -116,67 +120,59 @@ for _, strategy in helpers.each_strategy() do
             end
             get_and_assert(200, cb_error_status_code)
         end)
-        -- it("should remain open till t + open_timeout(sec) ", function()
-        --     for _ = 1, min_calls_in_window , 1 do
-        --         get_and_assert(500, 500)
-        --     end
-        --     ngx.sleep(wait_duration_in_open_state - 1)
-        --     get_and_assert(500, cb_error_status_code)
-        -- end)
-        -- it("should be half open after wait_duration_in_open_state ", function()
-        --     for _ = 1, min_calls_in_window - 1 , 1 do
-        --         get_and_assert(500, 500)
-        --     end
-        --     ngx.sleep(wait_duration_in_open_state)
-        --     get_and_assert(500, 500)
-        -- end)
-        -- it("should accept requests count <= half_open_max_calls_in_window in half_open state ", function()
-        --     for _ = 1, min_calls_in_window , 1 do
-        --         get_and_assert(500, 500)
-        --     end
-        --     ngx.sleep(wait_duration_in_open_state)
-        --     for _ = 1, half_open_max_calls_in_window , 1 do
-        --         get_and_assert(200, 200, 4)
-        --     end
-        --     get_and_assert(200, cb_error_status_code)
-        -- end)
-        -- it("should close from half_open state if err % < failure_percent_threshold "..
-        --     "&& request count >= half_open_min_calls_in_window ",
-        -- function()
-        --     for _ = 1, min_calls_in_window , 1 do
-        --         get_and_assert(500, 500)
-        --     end
-        --     ngx.sleep(wait_duration_in_open_state+1)
-        --     get_and_assert(200, 200)
-        --     for i = 1, half_open_min_calls_in_window  , 1 do
-        --         -- get_and_assert(ternary(i % 3 ~= 0, 200,500), ternary(i % 3 ~= 0, 200,500))
-        --         get_and_assert(200, 200)
-        --     end
-        --     get_and_assert(200, 200)
-        -- end)
-        -- it("should open after err % >= failure_percent_threshold in half open state ", function()
-        --     for _ = 1, min_calls_in_window , 1 do
-        --         get_and_assert(500, 500)
-        --     end
-        --     ngx.sleep(wait_duration_in_open_state)
-        --     for _ = 1, half_open_min_calls_in_window / 2, 1 do
-        --         get_and_assert(200, 200)
-        --         get_and_assert(500, 500)
-        --     end
-        --     get_and_assert(200, cb_error_status_code)
-        -- end)
-        -- it("should automatically close from half open state after wait_duration_in_half_open_state &"..
-        -- " request count < half_open_max_calls_in_window ", function()
-        --     for _ = 1, min_calls_in_window , 1 do
-        --         get_and_assert(500, 500)
-        --     end
-        --     ngx.sleep(wait_duration_in_open_state)
-        --     for _ = 1, half_open_min_calls_in_window - 1 , 1 do
-        --         get_and_assert(500, 500)
-        --     end
-        --     ngx.sleep(wait_duration_in_half_open_state)
-        --     get_and_assert(200, 200)
-        -- end)
+        it("should remain open till t + open_timeout(sec) ", function()
+            for _ = 1, min_calls_in_window , 1 do
+                get_and_assert(500, 500)
+            end
+            ngx.sleep(wait_duration_in_open_state - 1)
+            get_and_assert(500, cb_error_status_code)
+        end)
+        it("should be half open after wait_duration_in_open_state ", function()
+            for _ = 1, min_calls_in_window - 1 , 1 do
+                get_and_assert(500, 500)
+            end
+            ngx.sleep(wait_duration_in_open_state)
+            get_and_assert(500, 500)
+        end)
+
+
+        it("should close from half_open state if err % < failure_percent_threshold "..
+            "&& request count >= half_open_min_calls_in_window ",
+        function()
+            for _ = 1, min_calls_in_window , 1 do
+                get_and_assert(500, 500)
+            end
+            ngx.sleep(wait_duration_in_open_state+1)
+            get_and_assert(200, 200)
+            for i = 1, half_open_min_calls_in_window  , 1 do
+                -- get_and_assert(ternary(i % 3 ~= 0, 200,500), ternary(i % 3 ~= 0, 200,500))
+                get_and_assert(200, 200)
+            end
+            get_and_assert(200, 200)
+        end)
+        it("should open after err % >= failure_percent_threshold in half open state ", function()
+            for _ = 1, min_calls_in_window , 1 do
+                get_and_assert(500, 500)
+            end
+            ngx.sleep(wait_duration_in_open_state)
+            for _ = 1, half_open_min_calls_in_window / 2, 1 do
+                get_and_assert(200, 200)
+                get_and_assert(500, 500)
+            end
+            get_and_assert(200, cb_error_status_code)
+        end)
+        it("should automatically close from half open state after wait_duration_in_half_open_state &"..
+        " request count < half_open_max_calls_in_window ", function()
+            for _ = 1, min_calls_in_window , 1 do
+                get_and_assert(500, 500)
+            end
+            ngx.sleep(wait_duration_in_open_state)
+            for _ = 1, half_open_min_calls_in_window - 1 , 1 do
+                get_and_assert(500, 500)
+            end
+            ngx.sleep(wait_duration_in_half_open_state)
+            get_and_assert(200, 200)
+        end)
         it("should time out request after api_call_timeout_ms and open circuit ", function()
             get_and_assert(200, 200)
             for _ = 1, min_calls_in_window - 1 , 1 do
@@ -195,7 +191,7 @@ for _, strategy in helpers.each_strategy() do
                 get_and_assert(200, cb_error_status_code)
             end
             local new_cb_error_status_code = 598
-            change_config({error_status_code = new_cb_error_status_code})
+            change_config({error_status_code = new_cb_error_status_code, version = 2})
             get_and_assert(200, 200)
             for _ = 1, min_calls_in_window - 1 , 1 do
                 get_and_assert(200, 504, 1)
@@ -209,15 +205,7 @@ for _, strategy in helpers.each_strategy() do
 
         end)
         it("should not create circuit breakers for excluded apis", function()
-            get_and_assert(200, 200)
-            for _ = 1, min_calls_in_window - 1 , 1 do
-                get_and_assert(200, 504, 1)
-            end
-            for _ = 1, 10 , 1 do
-                get_and_assert(200, cb_error_status_code)
-            end
-
-            change_config({excluded_apis = "{\"GET_/test\": true}",})
+            change_config({excluded_apis = "{\"GET_/test\": true}", version = 3})
             get_and_assert(200, 200)
             for _ = 1, min_calls_in_window + 10 , 1 do
                 get_and_assert(500, 500)
@@ -226,5 +214,22 @@ for _, strategy in helpers.each_strategy() do
                 get_and_assert(200, 200)
             end
         end)
+
+      
+        --  This test case can't be tested as requests to really get stuck, we can't use ngx.sleep() in fixtures
+        -- it("should accept requests count <= half_open_max_calls_in_window in half_open state ", function()
+        --     for _ = 1, min_calls_in_window , 1 do
+        --         get_and_assert(500, 500)
+        --     end
+        --     ngx.sleep(wait_duration_in_open_state+1)
+        --     for x = 1, half_open_max_calls_in_window, 1 do
+        --         print("\n==================== call num: ", x)
+        --         get_and_assert(200, 504, 1)
+        --     end
+
+            
+        --     -- print("\n==================== now sending final call")
+        --     -- get_and_assert(200, cb_error_status_code)
+        -- end)
     end)
 end

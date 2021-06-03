@@ -2,7 +2,7 @@ local _M = {}
 
 _M.fixtures = {
     http_mock = {
-    enrich_req = [[
+    circuit_breaker = [[
 
         server {
             server_name app_config_10001;
@@ -13,11 +13,17 @@ _M.fixtures = {
 
             location = "/test" {
                 content_by_lua_block {
+                    print("nginx worker id : ")
+                    print(ngx.worker.id())
+
                     local request_headers = ngx.req.get_headers()
-                    ngx.status = tonumber(request_headers["response_http_code"])
+                    
                     if request_headers["put_delay"] then
                         ngx.sleep(tonumber(request_headers["put_delay"]))
                     end
+                    
+                    ngx.status = tonumber(request_headers["response_http_code"])
+
                     ngx.say("success")
                     return ngx.exit(0)
                 }

@@ -1,21 +1,17 @@
-local cjson = require "cjson"
 local pl_utils = require "pl.utils"
+local circuit_breaker_lib = require "lua-circuit-breaker.factory"
+local helpers = require "kong.plugins.circuit-breaker.helpers"
+local inspect = require "inspect"
 
 local kong = kong
 local ngx = ngx
-
-local circuit_breaker_lib = require "circuit-breaker-lib.factory"
 
 local CircuitBreakerHandler = {}
 CircuitBreakerHandler.PRIORITY = 930
 CircuitBreakerHandler.VERSION = "1.0.0"
 
 -- A table containing all circuit breakers for each API
-local circuit_breakers = circuit_breaker_lib:new({})
-
-local function get_api_identifier()
-	return kong.request.get_method() .. "_" .. kong.request.get_path()
-end
+local circuit_breakers = circuit_breaker_lib:new()
 
 local function is_successful(upstream_status_code)
 	return upstream_status_code and upstream_status_code < 500
@@ -30,28 +26,17 @@ local function get_circuit_breaker(conf, api_identifier)
 		cb_table_key = conf.service_id
 	end
 
+	conf.notify = function(state)
+		print(string.format("Breaker state changed to: %s", state))
+	end
+
 	return circuit_breakers:get_circuit_breaker(cb_table_key, api_identifier, conf)
 end
 
-local function get_excluded_apis(conf)
-	local service_id = conf.service_id
-	local route_id = conf.route_id
-
-	local cache_key = kong.db.plugins:cache_key("circuit_breaker_excluded_apis", service_id, route_id)
-    local excluded_apis, err = kong.core_cache:get(cache_key,
-                                                    nil,
-                                                    function(c) return cjson.decode(c["excluded_apis"]) end,
-                                                    conf)
-	if err then
-		error(err)
-	end
-
-	return excluded_apis
-end
 
 local function p_access(conf)
-	local excluded_apis = get_excluded_apis(conf)
-	local api_identifier = get_api_identifier()
+	local excluded_apis = helpers.get_excluded_apis(conf)
+	local api_identifier = helpers.get_api_identifier()
 
 	if excluded_apis[api_identifier] then
 		return
@@ -62,9 +47,14 @@ local function p_access(conf)
 
 	-- Start before proxy logic over here
 	local cb = get_circuit_breaker(conf, api_identifier)
+	print("\n======>Inside access call")
+	-- print(inspect(cb))
+
+
 
 	local _, err_cb = cb:_before()
 	if err_cb then
+		print("error in cb_before", err_cb)
 		local headers = {["Content-Type"] = conf.response_header_override or "text/plain"}
 		return kong.response.exit(conf.error_status_code, conf.error_msg_override or err_cb, headers)
 	end
@@ -82,6 +72,7 @@ function CircuitBreakerHandler:access(conf)
 	end
 end
 
+
 local function p_header_filter(conf)
 	if kong.response.get_status() and kong.response.get_status() ~= conf.error_status_code then
 		local cb = kong.ctx.plugin.cb
@@ -90,9 +81,11 @@ local function p_header_filter(conf)
 			return
 		end
 		local ok = is_successful(kong.response.get_status())
+		print("Calling cb._after with generation: ", kong.ctx.plugin.generation, ok, kong.response.get_status())
 		cb:_after(kong.ctx.plugin.generation, ok)
 	end
 end
+
 
 -- Run post proxy checks
 function CircuitBreakerHandler:header_filter(conf)
@@ -104,7 +97,7 @@ function CircuitBreakerHandler:header_filter(conf)
 end
 
 function CircuitBreakerHandler:log(conf)
-	local api_identifier = get_api_identifier()
+	local api_identifier = helpers.get_api_identifier()
 	local cb = kong.ctx.plugin.cb
 
 	if cb == nil then
@@ -112,7 +105,12 @@ function CircuitBreakerHandler:log(conf)
 	end
 	if cb._last_state_notified == false then
 		cb._last_state_notified = true
-		-- Send latest state change to your monitoring setup
+		-- Prepare latest state change and set it in context.
+		-- This data can be used later to do logging in a different plugin.
+		-- Example: Use this data to send events metrics to Datadog / New Relic.
+		if conf.set_logger_metrics_in_ctx == true then
+			helpers.set_logger_metrics(api_identifier, cb._state)
+		end
 		kong.log.notice("Circuit breaker state updated for route " .. api_identifier)
 	end
 end
