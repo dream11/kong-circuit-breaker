@@ -1,4 +1,4 @@
-# Circuit breaker library
+# Kong circuit breaker plugin
 
 - [Circuit breaker library](#circuit-breaker-library)
   - [Overview](#overview)

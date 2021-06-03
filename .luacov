@@ -1,6 +1,0 @@
-return {
-    ["include"] = {
-        'kong/plugins/circuit-breaker',
-        'kong/plugins/circuit-breaker-lib'
-    },
-}
