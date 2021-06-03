@@ -1,5 +1,5 @@
 local helpers = require "spec.helpers"
-local fixtures = require "kong.plugins.circuit-breaker.fixtures"
+local fixtures = require "spec.circuit-breaker.fixtures"
 local inspect = require "inspect"
 
 

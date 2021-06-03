@@ -23,8 +23,8 @@ dependencies = {
 build = {
     type = "builtin",
     modules = {
-        ["kong.plugins.circuit-breaker.handler"] = "src/handler.lua",
-        ["kong.plugins.circuit-breaker.schema"] = "src/schema.lua",
-        ["kong.plugins.circuit-breaker.helpers"] = "src/helpers.lua",
+        ["kong.plugins.circuit-breaker.handler"] = "kong/plugins/circuit-breaker/handler.lua",
+        ["kong.plugins.circuit-breaker.schema"] = "kong/plugins/circuit-breaker/schema.lua",
+        ["kong.plugins.circuit-breaker.helpers"] = "kong/plugins/circuit-breaker/helpers.lua",
     },
 }
