@@ -1,3 +1,4 @@
+pwd
 git clone git@github.com:Kong/gojira.git
 export GOJIRA_MAGIC_DEV=1
 export GOJIRA_USE_SNAPSHOT=1

@@ -35,4 +35,6 @@ jobs:
 
       - name: Build kong and run tests
         run: |
+          pwd
+          echo "Running script"
           ./.ci/scripts/run-tests.sh
