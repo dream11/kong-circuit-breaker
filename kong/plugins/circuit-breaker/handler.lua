@@ -1,7 +1,6 @@
 local pl_utils = require "pl.utils"
 local circuit_breaker_lib = require "lua-circuit-breaker.factory"
 local helpers = require "kong.plugins.circuit-breaker.helpers"
-local inspect = require "inspect"
 
 local kong = kong
 local ngx = ngx
@@ -27,7 +26,7 @@ local function get_circuit_breaker(conf, api_identifier)
 	end
 
 	conf.notify = function(state)
-		print(string.format("Breaker state changed to: %s", state))
+		kong.log.notice(string.format("Breaker state changed to: %s", state))
 	end
 
 	return circuit_breakers:get_circuit_breaker(cb_table_key, api_identifier, conf)
@@ -47,14 +46,9 @@ local function p_access(conf)
 
 	-- Start before proxy logic over here
 	local cb = get_circuit_breaker(conf, api_identifier)
-	print("\n======>Inside access call")
-	-- print(inspect(cb))
-
-
 
 	local _, err_cb = cb:_before()
 	if err_cb then
-		print("error in cb_before", err_cb)
 		local headers = {["Content-Type"] = conf.response_header_override or "text/plain"}
 		return kong.response.exit(conf.error_status_code, conf.error_msg_override or err_cb, headers)
 	end
@@ -81,7 +75,6 @@ local function p_header_filter(conf)
 			return
 		end
 		local ok = is_successful(kong.response.get_status())
-		print("Calling cb._after with generation: ", kong.ctx.plugin.generation, ok, kong.response.get_status())
 		cb:_after(kong.ctx.plugin.generation, ok)
 	end
 end
