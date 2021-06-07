@@ -1,4 +1,4 @@
-![kong-circuit-breaker](./docs/kong-circuit-breaker.svg)
+![kong-circuit-breaker](./kong-circuit-breaker.svg)
 
 [![Continuous Integration](https://github.com/dream11/kong-circuit-breaker/actions/workflows/ci.yml/badge.svg)](https://github.com/dream11/kong-circuit-breaker/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
