@@ -1,9 +1,6 @@
 local helpers = require "spec.helpers"
 local fixtures = require "spec.circuit-breaker.fixtures"
-local inspect = require "inspect"
 
-
-local strategy = "postgres"
 for _, strategy in helpers.each_strategy() do
     describe("circuit breaker plugin [#" .. strategy .. "]", function()
         local mock_host = helpers.mock_upstream_host;
@@ -144,7 +141,7 @@ for _, strategy in helpers.each_strategy() do
             end
             ngx.sleep(wait_duration_in_open_state+1)
             get_and_assert(200, 200)
-            for i = 1, half_open_min_calls_in_window  , 1 do
+            for _ = 1, half_open_min_calls_in_window  , 1 do
                 -- get_and_assert(ternary(i % 3 ~= 0, 200,500), ternary(i % 3 ~= 0, 200,500))
                 get_and_assert(200, 200)
             end
@@ -215,7 +212,6 @@ for _, strategy in helpers.each_strategy() do
             end
         end)
 
-      
         --  This test case can't be tested as requests to really get stuck, we can't use ngx.sleep() in fixtures
         -- it("should accept requests count <= half_open_max_calls_in_window in half_open state ", function()
         --     for _ = 1, min_calls_in_window , 1 do
@@ -227,7 +223,6 @@ for _, strategy in helpers.each_strategy() do
         --         get_and_assert(200, 504, 1)
         --     end
 
-            
         --     -- print("\n==================== now sending final call")
         --     -- get_and_assert(200, cb_error_status_code)
         -- end)

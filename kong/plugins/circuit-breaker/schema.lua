@@ -29,7 +29,6 @@ return {
 			config = {
 				type = "record",
 				fields = {
-					{version = {type = "number", required = true, default = 1}},
 					{min_calls_in_window = {type = "number", gt = 1, required = true, default = 20}},
 					{window_time = {type = "number", gt = 0, required = true, default = 10}},
 					{api_call_timeout_ms = {type = "number", gt = 0, required = true, default = 2000}},

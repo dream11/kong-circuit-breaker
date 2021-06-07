@@ -1,62 +1,78 @@
-# Kong circuit breaker plugin
+![kong-circuit-breaker](./docs/kong-circuit-breaker.svg)
 
-- [Circuit breaker library](#circuit-breaker-library)
-  - [Overview](#overview)
-  - [Sample Usage](#sample-usage)
-  - [Installation](#installation)
-
+[![Continuous Integration](https://github.com/dream11/kong-circuit-breaker/actions/workflows/ci.yml/badge.svg)](https://github.com/dream11/kong-circuit-breaker/actions/workflows/ci.yml)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## Overview
+`kong-circuit-breaker` is a Kong plugin which provides circuit-breaker functionality at route level. It uses [lua-circuit-breaker](https://github.com/dream11/lua-circuit-breaker) library internally to wrap proxy calls around a circuit-breaker pattern. The functionality provided by this plugin is similar to libraries like [resilience4j](https://github.com/resilience4j/resilience4j) in Java.
 
-The function of this library is to provide circuit breaker functionality to the circuit breaker plugin as well as the other plugins that make http calls.
+## Usecase
+In high throughput use cases, if an API of an upstream service results in timeouts/failures, the following will happen:
+1. It will bring a cascading failure effect to Kong and reduce its performance
+2. Continued calls to upstream service (which is facing downtime) wil prevent the upstream service from recovering
+Thus, it is essential for proxy calls made from Kong to fail fast using a smart configurable mechanism, leading to improved resiliency and fault tolerance.
 
-## Sample Usage
+## Behaviour
+The circuit breaker has 3 states:
+1. Open: no calls will be made to this route
+2. Half-open: some calls will be made to this route to check if it is responding with success or failure
+3. Closed: calls will be made to this route as usual
 
-```lua
---Import Circuit breaker factory.
-local circuit_breaker_lib = require "circuit-breaker-lib.factory"
 
---Create a new instance of the circuit breaker factory. Always set version=0. This is used to flush the circuit breakers when the configuration is changed.
-local circuit_breakers = circuit_breaker_lib:new({version = 0})
+## How does it work?
+Internally, the plugin uses [lua-circuit-breaker](https://github.com/dream11/lua-circuit-breaker) library to wrap proxy calls made by Kong with a circuit-breaker.
+1. To decide whether a route is in healthy/unhealthy state, success % and failure % is calculated in a time window of `window_time` seconds. 
+2. For any calculation to happen in step 1, total number of requests in time window should >= `min_calls_in_window`.
+3. If failure % calculated crosses `failure_percent_threshold` circuit is opened. This prevents anymore calls to this route until `wait_duration_in_open_state seconds` have elapsed. After this the circuit transitions to half-open state automatically
+4. In half open state, when total_requests are >= `half_open_min_calls_in_window`, failure % is calculated to resolve circuit-breaker into open or closed state.
+5. If the circuit-breaker is unable to resolve the state in `wait_duration_in_half_open_state` seconds, it automatically transitions into closed state.
 
--- Get a circuit breaker instance from factory. Returns a new instance only if not already created .
-local cb, err = circuit_breakers:get_circuit_breaker(
-    level, -- Level is used to flush all CBs at a certain level (Golbal / Service / Route) when cb configuration is changed at that level.
-    api_identifier, -- This is used to map the cicuit breaker to an api.
-    {
-
-        window_time = 10, -- Time window in seconds after which the state of the cb is reset.
-        min_calls_in_window= 20, -- The minimum number of requests in a window that go through the cb after which the breaking strategy is applied.
-        failure_percent_threshold= 51, -- Failure threshold after which the cb opens from closed or half open state.
-        wait_duration_in_open_state= 15, -- Time in seconds for which the cb remains in open state.
-        wait_duration_in_half_open_state= 120, -- Time in seconds for which the cb remains in half open state.
-        half_open_max_calls_in_window= 10, -- Maximum calls in half open state after which **too_many_requests** error is returned.
-        half_open_min_calls_in_window= 5, -- Minimum calls in half open state after which the calculation to open/close the circuit is done in half open state.
-        version = 1, -- Version is used to flush the cbs if the configuration is changed.
-        notify = function(state) -- This function is executed when the state of cb changes.
-            kong.log.info(string.format("Breaker %s state changed to: %s", "/co-auth", state._state))
-        end}
-)
--- Check state of cb. This function returns an error if the state is open or half_open_max_calls_in_window is breached.
-local _, err_cb = cb:_before()
-if err_cb then
-    return false, "Circuit breaker open error"
-end
-
--- Make the http call for which circuit breaking is required.
-local res, err_http = makeHttpCall(options)
-
--- Update the state of the cb based on successfull / failure response.
-local ok = res and res.status and res.status < 500
-cb:_after(cb._generation, ok)
-```
 
 ## Installation
 
-In **test** environment
+### luarocks
+```bash
+luarocks install kong-circuit-breaker
+```
 
-`gojira run "cd /kong-plugin/kong/plugins/lib && luarocks make"`
+### source
+Clone this repo and run:
+```
+luarocks make
+```
 
-On **production / staging**, run the below command inside **d11-kong repo**. Note that all the libraries inside **lib** folder will be installed by running this command only once.
 
-`cd plugins/lib && luarocks make`
+### Parameters
+
+| Key | Default  | Type  | Required | Description |
+| --- | --- | --- | --- | --- |
+| window_time | 10 | number | true | Window size in seconds |
+| api_call_timeout_ms |  2000 | number | Duration to wait before request is timed out and counted as failure |
+| min_calls_in_window | 20 | number | true | Minimum number of calls to be present in the window to start calculation |
+| failure_percent_threshold | 51 | number | true | % of requests that should fail to open the circuit |
+| wait_duration_in_open_state | 15 | number | true | Duration(sec) to wait before automatically transitioning from open to half-open state |
+| wait_duration_in_half_open_state | 120 | number | true | Duration(sec) to wait in half-open state before automatically transitioning to closed state |
+| half_open_min_calls_in_window | 5 | number | true | Minimum number of calls to be present in the half open state to start calculation |
+| half_open_max_calls_in_window | 10 | number | true | Maximum calls to allow in half open state |
+| error_status_code | 599 | number | Override  response status when circuit-breaker blocks the request |
+| error_msg_override | nil | string | Override with ustom messa gewhen circuit-breaker blocks the request |
+| response_header_override | nil | string | Override "Content-Type" response header when circuit-breaker blocks the request |
+| excluded_apis | "{\"GET_/kong-healthcheck\": true}" | string | Stringified json to prevent running circuit-breaker on these APIs |
+| set_logger_metrics_in_ctx | true | boolean | Sets circuit-breaker events in kong.ctx.shared to be consumed by other plugins (logger, APM etc) |
+
+## Caveats
+
+1. Circuit breaker uses time window to count failures, successes and total_requests. These windows are not sliding i.e. if you create a window of 10 seconds, windows will be created like: 
+``` 
+    window_1 (  0s - 10s ), 
+    window_2 ( 10s - 20s ),
+    window_3 ( 20s - 30s ) ... 
+```
+2. Circuit breaker uses failure % to figure out if a route is healthy or not. Always set `min_calls_in_window` to start calculations else you may open the circuit when total_requests are fairly low.
+3. Set `half_open_max_calls_in_window` to prevent allowing too many calls to the route in half-open state.
+4. `set_logger_metrics_in_ctx` sets circuit_breaker_name, upstream_service_host and circuit_breaker_state in `kong.ctx.shared.logger_metrics.circuit_breaker`. You can later use this data within context of a request to log these events.
+
+
+## Inspired by
+- [lua-circuit-breaker](https://github.com/dream11/lua-circuit-breaker)
+- [resilience4j](https://github.com/resilience4j/resilience4j)
