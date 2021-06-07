@@ -25,7 +25,6 @@ local function get_circuit_breaker(conf, api_identifier)
 		cb_table_key = conf.service_id
 	end
 
-	conf.version = 1
 	return circuit_breakers:get_circuit_breaker(api_identifier, cb_table_key, conf)
 end
 

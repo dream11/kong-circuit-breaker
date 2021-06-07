@@ -46,6 +46,7 @@ luarocks make
 
 | Key | Default  | Type  | Required | Description |
 | --- | --- | --- | --- | --- |
+| version | 0 | number | true | Version of configuration, for changes to take affect always increment this number |
 | window_time | 10 | number | true | Window size in seconds |
 | api_call_timeout_ms |  2000 | number | Duration to wait before request is timed out and counted as failure |
 | min_calls_in_window | 20 | number | true | Minimum number of calls to be present in the window to start calculation |
@@ -71,6 +72,7 @@ luarocks make
 2. Circuit breaker uses failure % to figure out if a route is healthy or not. Always set `min_calls_in_window` to start calculations else you may open the circuit when total_requests are fairly low.
 3. Set `half_open_max_calls_in_window` to prevent allowing too many calls to the route in half-open state.
 4. `set_logger_metrics_in_ctx` sets circuit_breaker_name, upstream_service_host and circuit_breaker_state in `kong.ctx.shared.logger_metrics.circuit_breaker`. You can later use this data within context of a request to log these events.
+5. `version` helps in recreating a new circuit-breaker object for a route if conf_new.version > conf_old.version, so whenever you make a change in configuration of the plugin also increment the version for changes to take affect.
 
 
 ## Inspired by
