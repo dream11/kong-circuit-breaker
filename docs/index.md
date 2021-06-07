@@ -1,4 +1,4 @@
-![lua-circuit-breaker](./lua-circuit-breaker.svg)
+![lua-circuit-breaker](./kong-circuit-breaker.svg)
 
 [![Continuous Integration](https://github.com/dream11/lua-circuit-breaker/actions/workflows/ci.yml/badge.svg)](https://github.com/dream11/lua-circuit-breaker/actions/workflows/ci.yml)
 [![Code Coverage](https://codecov.io/gh/dream11/lua-circuit-breaker/branch/master/graph/badge.svg?token=6wyFuRgmdG)](https://codecov.io/gh/dream11/lua-circuit-breaker)
