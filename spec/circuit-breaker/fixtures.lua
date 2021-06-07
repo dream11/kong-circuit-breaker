@@ -17,11 +17,11 @@ _M.fixtures = {
                     print(ngx.worker.id())
 
                     local request_headers = ngx.req.get_headers()
-                    
+
                     if request_headers["put_delay"] then
                         ngx.sleep(tonumber(request_headers["put_delay"]))
                     end
-                    
+
                     ngx.status = tonumber(request_headers["response_http_code"])
 
                     ngx.say("success")

@@ -25,11 +25,7 @@ local function get_circuit_breaker(conf, api_identifier)
 		cb_table_key = conf.service_id
 	end
 
-	conf.notify = function(state)
-		kong.log.notice(string.format("Breaker state changed to: %s", state))
-	end
-
-	return circuit_breakers:get_circuit_breaker(cb_table_key, api_identifier, conf)
+	return circuit_breakers:get_circuit_breaker(api_identifier, cb_table_key, conf)
 end
 
 
