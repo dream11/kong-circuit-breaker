@@ -41,6 +41,25 @@ Clone this repo and run:
 luarocks make
 ```
 
+## Usage
+```lua
+conf = {
+    version = 0,
+	window_time = 15,
+	min_calls_in_window = 20,
+	api_call_timeout_ms = 500,
+	failure_percent_threshold = 51,
+	wait_duration_in_open_state = 15,
+	wait_duration_in_half_open_state = 180,
+	error_status_code = 599
+}	
+```
+You can add this plugin on a global / service / route level in Kong API Gateway.
+
+Lets say you add this plugin at a global-level with conf. This will create a CB object for each route. 
+If you want to exclude some routes from being wrapped with CB then use `conf.excluded_apis`.
+If you want to override the configuration of global-level CB for a route (say /test), then enable this plugin for /test route also with a different conf.
+
 
 ### Parameters
 
