@@ -1,4 +1,4 @@
-package = "circuit-breaker"
+package = "kong-circuit-breaker"
 
 version = "1.0.0-1"
 

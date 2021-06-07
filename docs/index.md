@@ -47,20 +47,20 @@ luarocks make
 
 | Key | Default  | Type  | Required | Description |
 | --- | --- | --- | --- | --- |
-| version | 0 | number | true | Version of configuration, for changes to take affect always increment this number |
+| version | 0 | number | true | Version of plugin's configuration |
 | window_time | 10 | number | true | Window size in seconds |
-| api_call_timeout_ms |  2000 | number | Duration to wait before request is timed out and counted as failure |
+| api_call_timeout_ms |  2000 | number | true | Duration to wait before request is timed out and counted as failure |
 | min_calls_in_window | 20 | number | true | Minimum number of calls to be present in the window to start calculation |
 | failure_percent_threshold | 51 | number | true | % of requests that should fail to open the circuit |
 | wait_duration_in_open_state | 15 | number | true | Duration(sec) to wait before automatically transitioning from open to half-open state |
 | wait_duration_in_half_open_state | 120 | number | true | Duration(sec) to wait in half-open state before automatically transitioning to closed state |
 | half_open_min_calls_in_window | 5 | number | true | Minimum number of calls to be present in the half open state to start calculation |
 | half_open_max_calls_in_window | 10 | number | true | Maximum calls to allow in half open state |
-| error_status_code | 599 | number | Override  response status when circuit-breaker blocks the request |
-| error_msg_override | nil | string | Override with ustom messa gewhen circuit-breaker blocks the request |
-| response_header_override | nil | string | Override "Content-Type" response header when circuit-breaker blocks the request |
-| excluded_apis | "{\"GET_/kong-healthcheck\": true}" | string | Stringified json to prevent running circuit-breaker on these APIs |
-| set_logger_metrics_in_ctx | true | boolean | Sets circuit-breaker events in kong.ctx.shared to be consumed by other plugins (logger, APM etc) |
+| error_status_code | 599 | number | false | Override response status code in case of error (circuit-breaker blocks the request) |
+| error_msg_override | nil | string | false | Override with custom message in case of error |
+| response_header_override | nil | string | false | Override "Content-Type" response header in case of error |
+| excluded_apis | "{\"GET_/kong-healthcheck\": true}" | string | true | Stringified json to prevent running circuit-breaker on these APIs |
+| set_logger_metrics_in_ctx | true | boolean | false | Set circuit-breaker events in kong.ctx.shared to be consumed by other plugins like logger |
 
 ## Caveats
 
