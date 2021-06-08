@@ -30,7 +30,7 @@ Internally, the plugin uses [lua-circuit-breaker](https://github.com/dream11/lua
 
 ## Installation
 
-### luarocks
+### [luarocks](https://luarocks.org/modules/dream11/kong-circuit-breaker)
 ```bash
 luarocks install kong-circuit-breaker
 ```
