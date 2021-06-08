@@ -56,9 +56,9 @@ conf = {
 ```
 You can add this plugin on a global / service / route level in Kong API Gateway.
 
-Lets say you add this plugin at a global-level with conf. This will create a CB object for each route. 
-If you want to exclude some routes from being wrapped with CB then use `conf.excluded_apis`.
-If you want to override the configuration of global-level CB for a route (say /test), then enable this plugin for /test route also with a different conf.
+* Lets say you add this plugin at a global-level with conf, this will create a CB object for each route.
+* If you want to exclude some routes from being wrapped with CB then use `conf.excluded_apis`.
+* If you want to override the configuration of global-level CB for a route (say ```GET /test```), then enable this plugin for ```GET /test``` route also with a different conf.
 
 
 ### Parameters
@@ -88,11 +88,11 @@ If you want to override the configuration of global-level CB for a route (say /t
     window_2 ( 10s - 20s ),
     window_3 ( 20s - 30s ) ...
 ```
-2. Circuit breaker uses failure % to figure out if a route is healthy or not. Always set `min_calls_in_window` to start calculations; else, you may open the circuit when total_requests are relatively low.
-3. Set `half_open_max_calls_in_window` to prevent allowing too many requests to the route in the half-open state.
-4. `set_logger_metrics_in_ctx` sets circuit_breaker_name, upstream_service_host and circuit_breaker_state in `kong.ctx.shared.logger_metrics.circuit_breaker`. You can later use this data within context of a request to log these events.
-5. `version` helps in recreating a new circuit-breaker object for a route if `conf_new.version > conf_old.version`, so whenever you change the plugin configuration, increment the version for changes to take effect.
-
+2. Circuit-breaker object is created for each route in each nginx worker. The state of CB object (like counters) is never shared among workers. While setting the configuration, carefully set parameters like `min_calls_in_window` taking total nginx workers into account.
+3. Circuit breaker uses failure % to figure out if a route is healthy or not. Always set `min_calls_in_window` to start calculations; else, you may open the circuit when total_requests are relatively low.
+4. Set `half_open_max_calls_in_window` to prevent allowing too many requests to the route in the half-open state.
+5. `set_logger_metrics_in_ctx` sets circuit_breaker_name, upstream_service_host and circuit_breaker_state in `kong.ctx.shared.logger_metrics.circuit_breaker`. You can later use this data within context of a request to log these events.
+6. `version` helps in recreating a new circuit-breaker object for a route if `conf_new.version > conf_old.version`, so whenever you change the plugin configuration, increment the version for changes to take effect.
 
 ## Inspired by
 - [lua-circuit-breaker](https://github.com/dream11/lua-circuit-breaker)
