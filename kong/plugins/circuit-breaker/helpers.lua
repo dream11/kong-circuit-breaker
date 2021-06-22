@@ -27,11 +27,15 @@ local function set_logger_metrics(api_identifier, new_state)
 		kong.ctx.shared.logger_metrics = {}
 	end
 	-- kong.ctx.shared object is specific to the lifecycle of a request and is used to share data between plugins
-	kong.ctx.shared.logger_metrics.circuit_breaker = {
-		"upstream:" .. upstream_host,
-		"circuit_breaker:" .. api_identifier,
-		"cb_state:" .. new_state
-	}
+    table.insert(kong.ctx.shared.logger_metrics, {
+        type = "circuit_breaker",
+        tags = {
+            "upstream:" .. upstream_host,
+            "circuit_breaker:" .. api_identifier,
+            "cb_state:" .. new_state
+        }
+    })
+
 end
 
 return {
