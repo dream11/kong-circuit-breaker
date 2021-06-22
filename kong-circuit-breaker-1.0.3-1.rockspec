@@ -17,7 +17,7 @@ description = {
 
 dependencies = {
     "lua >= 5.1",
-    "lua-circuit-breaker >= 1.0.3",
+    "lua-circuit-breaker >= 1.0.2",
 }
 
 build = {
