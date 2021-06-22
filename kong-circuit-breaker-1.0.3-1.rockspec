@@ -1,11 +1,11 @@
 package = "kong-circuit-breaker"
 
-version = "1.0.2-1"
+version = "1.0.3-1"
 
 supported_platforms = {"linux", "macosx"}
 source = {
     url = "git://github.com/dream11/kong-circuit-breaker",
-    tag = "v1.0.2"
+    tag = "v1.0.3"
 }
 
 description = {
@@ -17,7 +17,7 @@ description = {
 
 dependencies = {
     "lua >= 5.1",
-    "lua-circuit-breaker >= 1.0.2",
+    "lua-circuit-breaker >= 1.0.3",
 }
 
 build = {
