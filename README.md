@@ -35,6 +35,14 @@ Internally, the plugin uses [lua-circuit-breaker](https://github.com/dream11/lua
 luarocks install kong-circuit-breaker
 ```
 
+You will also need to enable this plugin by adding it to the list of enabled plugins using `KONG_PLUGINS` environment variable or the `plugins` key in `kong.conf`
+
+    export KONG_PLUGINS=circuit-breaker
+
+OR
+
+    plugins=circuit-breaker
+
 ### source
 Clone this repo and run:
 ```
