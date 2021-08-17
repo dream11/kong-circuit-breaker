@@ -120,11 +120,11 @@ function CircuitBreakerHandler:init_worker()
 			local route_id = key_parts[3]
 
 			if route_id ~= "" then
-				circuit_breakers:remove_breakers_by_level(route_id) -- Route level circuit breaker
+				circuit_breakers:remove_breakers_by_group(route_id) -- Route level circuit breaker
 			elseif service_id ~= "" then
-				circuit_breakers:remove_breakers_by_level(service_id) -- Service level circuit breaker
+				circuit_breakers:remove_breakers_by_group(service_id) -- Service level circuit breaker
 			else
-				circuit_breakers:remove_breakers_by_level("global") -- Global circuit breaker
+				circuit_breakers:remove_breakers_by_group("global") -- Global circuit breaker
 			end
 
 			local cache_key = kong.db.plugins:cache_key("circuit_breaker_excluded_apis", service_id, route_id)
