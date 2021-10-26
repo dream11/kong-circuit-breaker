@@ -43,7 +43,7 @@ local function p_access(conf)
 	ngx.ctx.service.read_timeout = conf["api_call_timeout_ms"]
 
 	-- Start before proxy logic over here
-    conf.version = DEFAULT_VERSION
+	conf.version = DEFAULT_VERSION
 	local cb = get_circuit_breaker(conf, api_identifier)
 
 	local _, err_cb = cb:_before()

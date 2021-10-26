@@ -178,6 +178,29 @@ for _, strategy in helpers.each_strategy() do
                 get_and_assert(200, cb_error_status_code)
             end
         end)
+
+        it("should create new circuit breaker on config change", function()
+            get_and_assert(200, 200)
+            for _ = 1, min_calls_in_window - 1 , 1 do
+                get_and_assert(200, 504, 1)
+            end
+            for _ = 1, 10 , 1 do
+                get_and_assert(200, cb_error_status_code)
+            end
+            local new_cb_error_status_code = 598
+            change_config({error_status_code = new_cb_error_status_code})
+            get_and_assert(200, 200)
+            for _ = 1, min_calls_in_window - 1 , 1 do
+                get_and_assert(200, 504, 1)
+            end
+            for _ = 1, 10 , 1 do
+                get_and_assert(200, new_cb_error_status_code)
+            end
+            finally(function ()
+                change_config({error_status_code = cb_error_status_code})
+            end)
+        end)
+
         it("should not create circuit breakers for excluded apis", function()
             change_config({excluded_apis = "{\"GET_/test\": true}"})
             get_and_assert(200, 200)
