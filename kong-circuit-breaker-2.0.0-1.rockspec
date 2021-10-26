@@ -1,11 +1,11 @@
 package = "kong-circuit-breaker"
 
-version = "1.0.5-1"
+version = "2.0.0-1"
 
 supported_platforms = {"linux", "macosx"}
 source = {
     url = "git://github.com/dream11/kong-circuit-breaker",
-    tag = "v1.0.5"
+    tag = "v2.0.0"
 }
 
 description = {
