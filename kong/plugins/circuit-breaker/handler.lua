@@ -6,10 +6,11 @@ local kong = kong
 local ngx = ngx
 
 local CircuitBreakerHandler = {}
-CircuitBreakerHandler.PRIORITY = 930
 CircuitBreakerHandler.VERSION = "1.0.0"
+CircuitBreakerHandler.PRIORITY = tonumber(os.getenv("PRIORITY_CIRCUIT_BREAKER")) or 930
+kong.log.info("Plugin priority set to " .. CircuitBreakerHandler.PRIORITY .. (os.getenv("PRIORITY_CIRCUIT_BREAKER") and " from env" or " by default"))
 
-local DEFAULT_VERSION =1
+local DEFAULT_VERSION = 1
 
 -- A table containing all circuit breakers for each API
 local circuit_breakers = circuit_breaker_lib:new()
