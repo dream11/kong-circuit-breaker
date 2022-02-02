@@ -52,7 +52,6 @@ luarocks make
 ## Usage
 ```lua
 conf = {
-    version = 0,
 	window_time = 15,
 	min_calls_in_window = 20,
 	api_call_timeout_ms = 500,
@@ -73,7 +72,6 @@ You can add this plugin on a global / service / route level in Kong API Gateway.
 
 | Key | Default  | Type  | Required | Description |
 | --- | --- | --- | --- | --- |
-| version | 0 | number | true | Version of plugin's configuration |
 | window_time | 10 | number | true | Window size in seconds |
 | api_call_timeout_ms |  2000 | number | true | Duration to wait before request is timed out and counted as failure |
 | min_calls_in_window | 20 | number | true | Minimum number of calls to be present in the window to start calculation |
@@ -100,7 +98,6 @@ You can add this plugin on a global / service / route level in Kong API Gateway.
 3. Circuit breaker uses failure % to figure out if a route is healthy or not. Always set `min_calls_in_window` to start calculations; else, you may open the circuit when total_requests are relatively low.
 4. Set `half_open_max_calls_in_window` to prevent allowing too many requests to the route in the half-open state.
 5. `set_logger_metrics_in_ctx` sets circuit_breaker_name, upstream_service_host and circuit_breaker_state in `kong.ctx.shared.logger_metrics.circuit_breaker`. You can later use this data within context of a request to log these events.
-6. `version` helps in recreating a new circuit-breaker object for a route if `conf_new.version > conf_old.version`, so whenever you change the plugin configuration, increment the version for changes to take effect.
 
 
 ## Inspired by
