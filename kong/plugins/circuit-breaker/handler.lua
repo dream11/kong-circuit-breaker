@@ -41,7 +41,7 @@ local function p_access(conf)
 	end
 
 	-- Set timeout for request after which it will be treated as a failure
-	ngx.ctx.service.read_timeout = conf["api_call_timeout_ms"]
+	ngx.ctx.balancer_data.read_timeout = conf["api_call_timeout_ms"]
 
 	-- Start before proxy logic over here
 	conf.version = DEFAULT_VERSION
