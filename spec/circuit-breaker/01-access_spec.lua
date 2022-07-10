@@ -1,7 +1,7 @@
 local helpers = require "spec.helpers"
 local fixtures = require "spec.circuit-breaker.fixtures"
 
-strategies = {"postgres"}
+local strategies = {"postgres"}
 
 for _, strategy in ipairs(strategies) do
     describe("circuit breaker plugin [#" .. strategy .. "]", function()
