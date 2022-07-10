@@ -1,2 +1,2 @@
 --postgres
---cassandra
+--no-cassandra
