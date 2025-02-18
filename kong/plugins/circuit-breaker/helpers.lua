@@ -2,15 +2,22 @@ local cjson = require "cjson"
 
 local kong = kong
 
+local function load_cache_from_db(service_id, route_id)
+    local key = kong.db.plugins:cache_key("circuit_breaker", service_id,
+                                          route_id)
+    local row, err = kong.db.plugins:select_by_cache_key(key)
+    if err then return nil, tostring(err) end
+    return cjson.decode(row.config.excluded_apis)
+end
+
 local function get_excluded_apis(conf)
     local service_id = conf.service_id
     local route_id = conf.route_id
 
     local cache_key = kong.db.plugins:cache_key("circuit_breaker_excluded_apis", service_id, route_id)
-    local excluded_apis, err = kong.core_cache:get(cache_key,
-                                                    nil,
-                                                    function(c) return cjson.decode(c["excluded_apis"]) end,
-                                                    conf)
+    local excluded_apis, err = kong.core_cache:get(cache_key, nil,
+                                                   load_cache_from_db,
+                                                   service_id, route_id)
     if err then
         error(err)
     end
