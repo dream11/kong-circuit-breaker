@@ -5,8 +5,13 @@ local kong = kong
 local function get_excluded_apis(conf)
     local service_id = conf.service_id
     local route_id = conf.route_id
+    local consumer = kong.client.get_consumer()
+    local consumer_id
+    if consumer ~= nil then
+        consumer_id = consumer.id
+    end
 
-    local cache_key = kong.db.plugins:cache_key("circuit_breaker_excluded_apis", service_id, route_id)
+    local cache_key = kong.db.plugins:cache_key("circuit_breaker_excluded_apis", service_id, route_id, consumer_id)
     local excluded_apis, err = kong.core_cache:get(cache_key,
                                                     nil,
                                                     function(c) return cjson.decode(c["excluded_apis"]) end,
