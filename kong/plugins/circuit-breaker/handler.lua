@@ -27,12 +27,6 @@ end
 
 -- Return circuit breaker instance for this API
 local function get_circuit_breaker(conf, api_identifier)
-    local consumer = kong.client.get_consumer()
-    local consumer_id
-    if consumer ~= nil then
-        consumer_id = consumer.id
-    end
-
     local cb_table_key = "global"
     if conf.route_id ~= nil then
         cb_table_key = conf.route_id
@@ -40,8 +34,8 @@ local function get_circuit_breaker(conf, api_identifier)
         cb_table_key = conf.service_id
     end
 
-    if consumer_id ~= nil then
-        cb_table_key = consumer_id .. "_" .. cb_table_key
+    if conf.consumer_id ~= nil then
+        cb_table_key = conf.consumer_id .. "_" .. cb_table_key
     end
 
     return circuit_breakers:get_circuit_breaker(api_identifier, cb_table_key, conf)
@@ -136,16 +130,16 @@ function CircuitBreakerHandler:init_worker()
                 return
             end
 
-            local consumer_id = key_parts[5]
-            local service_id = key_parts[4]
             local route_id = key_parts[3]
+            local service_id = key_parts[4]
+            local consumer_id = key_parts[5]
 
-            local group_prefix
-            if consumer_id~= nil then
-                group_prefix = consumer_id .. "_"
+            local group_prefix, group_suffix
+
+            if consumer_id ~= "" then
+                group_prefix = consumer_id
             end
 
-            local group_suffix
             if route_id ~= "" then
                 group_suffix = route_id -- Route level circuit breaker
             elseif service_id ~= "" then
@@ -154,8 +148,8 @@ function CircuitBreakerHandler:init_worker()
                 group_suffix = "global" -- Global circuit breaker
             end
 
-            if group_prefix~=nil then
-                circuit_breakers:remove_breakers_by_group(group_prefix .. group_suffix)
+            if group_prefix ~= nil then
+                circuit_breakers:remove_breakers_by_group(group_prefix .. "_" .. group_suffix)
             else
                 circuit_breakers:remove_breakers_by_group(group_suffix)
             end
