@@ -28,6 +28,24 @@ _M.fixtures = {
                     return ngx.exit(0)
                 }
             }
+            
+            location = "/test2" {
+                content_by_lua_block {
+                    print("nginx worker id : ")
+                    print(ngx.worker.id())
+
+                    local request_headers = ngx.req.get_headers()
+
+                    if request_headers["put_delay"] then
+                        ngx.sleep(tonumber(request_headers["put_delay"]))
+                    end
+
+                    ngx.status = tonumber(request_headers["response_http_code"])
+
+                    ngx.say("success")
+                    return ngx.exit(0)
+                }
+            }
         }
   ]]
   },

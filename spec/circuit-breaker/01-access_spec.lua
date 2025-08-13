@@ -32,25 +32,78 @@ for _, strategy in ipairs(strategies) do
             excluded_apis = excluded_apis,
         }
 
-        local bp, db = helpers.get_db_utils(strategy, {"routes", "services", "plugins"}, {"circuit-breaker"});
+        local consumer_a_cb_config = {
+            min_calls_in_window = min_calls_in_window,
+            window_time = window_time,
+            api_call_timeout_ms = api_call_timeout_ms,
+            failure_percent_threshold = failure_percent_threshold,
+            wait_duration_in_open_state = wait_duration_in_open_state,
+            wait_duration_in_half_open_state = wait_duration_in_half_open_state,
+            half_open_max_calls_in_window = half_open_max_calls_in_window,
+            half_open_min_calls_in_window = half_open_min_calls_in_window,
+            error_status_code = 598, -- Different error code for consumer A
+            excluded_apis = excluded_apis,
+        }
 
-        assert(bp.routes:insert({
+        local bp, db = helpers.get_db_utils(strategy, {"routes", "services", "plugins", "consumers", "keyauth_credentials"}, {"circuit-breaker", "key-auth"});
+
+        local service = assert(bp.services:insert(
+            {
+                protocol = "http",
+                host = mock_host, -- Just a dummy value. Not honoured
+                port = mock_port, -- Just a dummy value. Not honoured
+                name = "test",
+                connect_timeout = 1000,
+                read_timeout = 1000,
+                write_timeout = 1000,
+                retries = 0
+            }))
+
+        local route = assert(bp.routes:insert({
             methods = {"GET"},
             protocols = {"http"},
             paths = {"/test"},
             strip_path = false,
             preserve_host = true,
-            service = bp.services:insert(
-                {
-                    protocol = "http",
-                    host = mock_host, -- Just a dummy value. Not honoured
-                    port = mock_port, -- Just a dummy value. Not honoured
-                    name = "test",
-                    connect_timeout = 1000,
-                    read_timeout = 1000,
-                    write_timeout = 1000,
-                    retries = 0
-                })
+            service = service
+        }))
+
+        local route2 = assert(bp.routes:insert({
+            methods = {"GET"},
+            protocols = {"http"},
+            paths = {"/test2"},
+            strip_path = false,
+            preserve_host = true,
+            service = service
+        }))
+
+        -- Create consumers for testing consumer-level circuit breakers
+        local consumer_a = assert(bp.consumers:insert({
+            username = "consumer_a",
+            custom_id = "consumer_a_id"
+        }))
+
+        local consumer_b = assert(bp.consumers:insert({
+            username = "consumer_b", 
+            custom_id = "consumer_b_id"
+        }))
+
+        -- Create API key credentials for consumers
+        local key_auth_a = assert(bp.keyauth_credentials:insert({
+            consumer = consumer_a,
+            key = "key_a"
+        }))
+
+        local key_auth_b = assert(bp.keyauth_credentials:insert({
+            consumer = consumer_b,
+            key = "key_b"
+        }))
+
+        -- Enable key-auth plugin on the route for consumer authentication
+        local key_auth_plugin = assert(bp.plugins:insert({
+            name = "key-auth",
+            route = route2,
+            config = {}
         }))
 
         local circuit_breaker_plugin = bp.plugins:insert{
@@ -58,24 +111,44 @@ for _, strategy in ipairs(strategies) do
             config = default_config
         }
 
-        local get_and_assert = function (res_status_to_be_generated, res_status_expected, put_delay)
+        -- Consumer-specific circuit breaker plugin for consumer_a with different config
+        local consumer_a_cb_plugin = bp.plugins:insert{
+            name = "circuit-breaker",
+            consumer = consumer_a,
+            config = consumer_a_cb_config,
+        }
+
+        local get_and_assert = function (res_status_to_be_generated, res_status_expected, put_delay, api_key, path)
             local proxy_client = helpers.proxy_client()
+            local headers = {
+                response_http_code = res_status_to_be_generated,
+                put_delay = put_delay or 0,
+            }
+            
+            -- Add API key for consumer authentication if provided
+            if api_key then
+                headers["apikey"] = api_key
+            end
+
+            if path then
+                path = path
+            else
+                path = "/test"
+            end
+            
             local res = assert(
                 proxy_client:send({
                     method = "GET",
-                    path = "/test",
-                    headers = {
-                        response_http_code = res_status_to_be_generated,
-                        put_delay = put_delay or 0,
-                    },
+                    path = path,
+                    headers = headers,
                 }))
             assert.are.same(res_status_expected, res.status)
             proxy_client:close()
         end
 
-        local update_plugin = function(config, enabled)
+        local update_plugin = function(plugin_id, config, enabled)
             local admin_client = helpers.admin_client()
-            local url = "/plugins/" .. circuit_breaker_plugin["id"]
+            local url = "/plugins/" .. plugin_id
 
             local admin_res = assert(
                 admin_client:patch(url, {
@@ -86,7 +159,18 @@ for _, strategy in ipairs(strategies) do
                         enabled = enabled,
                     },
                 }))
-            assert.res_status(200, admin_res)
+            assert.equal(200, admin_res.status)
+            admin_client:close()
+        end
+
+        local disable_plugin = function(plugin_id)
+            local admin_client = helpers.admin_client()
+            local url = "/plugins/" .. plugin_id
+            local admin_res = assert(admin_client:patch(url, {
+                headers = {["Content-Type"] = "application/json"},
+                body = {enabled = false},
+            }))
+            assert.equal(200, admin_res.status)
             admin_client:close()
         end
 
@@ -94,7 +178,7 @@ for _, strategy in ipairs(strategies) do
             print("setting up")
             assert(helpers.start_kong({
                 database = strategy,
-                plugins = "circuit-breaker",
+                plugins = "circuit-breaker,key-auth",
                 nginx_conf = "spec/fixtures/custom_nginx.template"
             }, nil, nil, fixtures.fixtures))
         end)
@@ -105,7 +189,8 @@ for _, strategy in ipairs(strategies) do
 
         before_each(function ()
             print("updating config")
-            update_plugin(default_config)
+            update_plugin(circuit_breaker_plugin["id"], default_config, true)
+            update_plugin(consumer_a_cb_plugin["id"], consumer_a_cb_config, true)
         end)
 
         -- after_each(function ()
@@ -211,7 +296,7 @@ for _, strategy in ipairs(strategies) do
                 get_and_assert(200, cb_error_status_code)
             end
             local new_cb_error_status_code = 598
-            update_plugin({error_status_code = new_cb_error_status_code})
+            update_plugin(circuit_breaker_plugin["id"], {error_status_code = new_cb_error_status_code})
             get_and_assert(200, 200)
             for _ = 1, min_calls_in_window - 1 , 1 do
                 get_and_assert(200, 504, 1)
@@ -220,12 +305,12 @@ for _, strategy in ipairs(strategies) do
                 get_and_assert(200, new_cb_error_status_code)
             end
             finally(function ()
-                update_plugin({error_status_code = cb_error_status_code})
+                update_plugin(circuit_breaker_plugin["id"], {error_status_code = cb_error_status_code})
             end)
         end)
 
         it("should not create circuit breakers for excluded apis", function()
-            update_plugin({excluded_apis = "{\"GET_/test\": true}"})
+            update_plugin(circuit_breaker_plugin["id"], {excluded_apis = "{\"GET_/test\": true}"})
             get_and_assert(200, 200)
             for _ = 1, min_calls_in_window + 10 , 1 do
                 get_and_assert(500, 500)
@@ -243,13 +328,30 @@ for _, strategy in ipairs(strategies) do
             get_and_assert(504, 504, 0.5)
 
             -- Disable plugin
-            update_plugin(default_config, false)
+            disable_plugin(circuit_breaker_plugin["id"])
 
             -- Call taking time t where, api_call_timeout of disable plugin < t < service timeout should succeed
             get_and_assert(200, 200, 0.5)
 
             -- Call taking time t where, api_call_timeout of disable plugin < service timeout < t should fail
             get_and_assert(504, 504, 1.5)
+        end)
+
+
+        it("should use consumer-specific circuit breaker plugin if consumer is authenticated", function()
+            for _ = 1, min_calls_in_window , 1 do
+                get_and_assert(500, 500, 0, "key_a", "/test2")
+            end
+            get_and_assert(200, 598, 0, "key_a", "/test2")
+            get_and_assert(200, 200, 0, "key_b", "/test2")
+            get_and_assert(200, 200, 0)
+        end)
+
+        it("should open global circuit breaker if circuit breaker plugin is not enabled for consumer", function()
+            for _ = 1, min_calls_in_window, 1 do
+                get_and_assert(500, 500, 0, "key_b", "/test2")
+            end
+            get_and_assert(200, 599, 0, "key_b", "/test2")
         end)
 
         --  This test case can't be tested as requests to really get stuck, we can't use ngx.sleep() in fixtures

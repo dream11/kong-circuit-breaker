@@ -34,6 +34,10 @@ local function get_circuit_breaker(conf, api_identifier)
         cb_table_key = conf.service_id
     end
 
+    if conf.consumer_id ~= nil then
+        cb_table_key = conf.consumer_id .. "_" .. cb_table_key
+    end
+
     return circuit_breakers:get_circuit_breaker(api_identifier, cb_table_key, conf)
 end
 
@@ -126,18 +130,31 @@ function CircuitBreakerHandler:init_worker()
                 return
             end
 
-            local service_id = key_parts[4]
             local route_id = key_parts[3]
+            local service_id = key_parts[4]
+            local consumer_id = key_parts[5]
 
-            if route_id ~= "" then
-                circuit_breakers:remove_breakers_by_group(route_id) -- Route level circuit breaker
-            elseif service_id ~= "" then
-                circuit_breakers:remove_breakers_by_group(service_id) -- Service level circuit breaker
-            else
-                circuit_breakers:remove_breakers_by_group("global") -- Global circuit breaker
+            local group_prefix, group_suffix
+
+            if consumer_id ~= "" then
+                group_prefix = consumer_id
             end
 
-            local cache_key = kong.db.plugins:cache_key("circuit_breaker_excluded_apis", service_id, route_id)
+            if route_id ~= "" then
+                group_suffix = route_id -- Route level circuit breaker
+            elseif service_id ~= "" then
+                group_suffix = service_id  -- Service level circuit breaker
+            else
+                group_suffix = "global" -- Global circuit breaker
+            end
+
+            if group_prefix ~= nil then
+                circuit_breakers:remove_breakers_by_group(group_prefix .. "_" .. group_suffix)
+            else
+                circuit_breakers:remove_breakers_by_group(group_suffix)
+            end
+
+            local cache_key = kong.db.plugins:cache_key("circuit_breaker_excluded_apis", service_id, route_id, consumer_id)
             kong.core_cache:invalidate(cache_key, false)
         end,
         "mlcache",

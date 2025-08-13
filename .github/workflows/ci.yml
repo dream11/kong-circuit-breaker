@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 env:
-  KONG_VERSION: 2.2.0
+  KONG_VERSION: 3.9.x
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -30,7 +30,7 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
 
       - name: Checkout github branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
